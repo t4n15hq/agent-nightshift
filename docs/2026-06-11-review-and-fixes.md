@@ -99,13 +99,14 @@ finished work evaporated. It also meant committed changes bypassed the
 tracked-file protected-path check.
 
 **Decision:** record the SHA at branch creation (`baseSha`) and diff against
-it everywhere. `commit()` became `commitAll(message, baseSha)`: it stages
-everything, commits only if anything is staged, and treats an empty stage as
-an error only when the branch also has no commits past `baseSha` — so agent
-commits are kept and pushed rather than rejected. Cleanup now force-switches
-(`git switch --discard-changes`) back to the original branch, because
-restoring a protected-file snapshot over an agent *commit* leaves the tree
-dirty and a plain switch would strand the repo on the worker branch.
+it everywhere. `commit()` became `commitAll(message, baseSha)`: it soft-resets
+any agent-created commits to the branch point, stages the complete change, and
+creates one worker-owned commit with the required issue-specific message. The
+agent's file changes survive, but arbitrary agent commit messages and commit
+stacks do not. Cleanup now force-switches (`git switch --discard-changes`) back
+to the original branch, because restoring a protected-file snapshot over an
+agent *commit* leaves the tree dirty and a plain switch would strand the repo
+on the worker branch.
 
 While testing this, a pre-existing off-by-one surfaced: untracked files ending
 in a newline were counted one line too long in `diffLineCount`. Fixed.
@@ -117,12 +118,14 @@ If the process died (power loss, SIGKILL, forced sleep) after the
 skips labeled issues, so the issue became permanently invisible. The stale
 *lock* was already handled; the stale *label* was not.
 
-**Decision:** at the start of each run — after the lock is held, so no other
-worker can race — list issues labeled `claude-in-progress` and reconcile each:
-if a PR exists for its deterministic branch, set `claude-pr-opened` (or
-`human-review-required` for a closed PR); otherwise return it to
-`claude-ready` with an explanatory comment. Holding the lock is what makes
-"any in-progress label seen now is stale" a safe assumption.
+**Decision:** each claim writes a timestamped marker comment. At the start of a
+run, issues labeled `claude-in-progress` are reconciled only when that marker is
+older than `staleInProgressMinutes` (default: the agent timeout plus 30
+minutes). If a PR exists for its deterministic branch, set `claude-pr-opened`
+(or `human-review-required` for a closed PR); otherwise return it to
+`claude-ready` with an explanatory comment. A local lock does not coordinate
+separate clones or machines, so recent and unmarked in-progress issues are left
+alone instead of being assumed stale.
 
 ## Small fixes
 
@@ -143,9 +146,8 @@ if a PR exists for its deterministic branch, set `claude-pr-opened` (or
   the worker on repos where strangers can edit issues you label.
 - The limit-detection regexes can still false-positive (e.g. a failing issue
   about rate limiting); the retry cap bounds the damage to N runs.
-- `dist/` stays committed so cron needs no build step; it can drift from
-  `src/` if a change is committed without `npm run build` (the test script
-  builds first, which mitigates this).
+- `dist/` is ignored, so each clone must run `npm run build` before installing
+  cron and after pulling worker updates.
 - The current `config.json` pointing the worker at this repository itself is
   fine for smoke-testing, but real use should point `repoPath` at a dedicated
   clean clone of the target project, per the README.

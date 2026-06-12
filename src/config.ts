@@ -33,6 +33,7 @@ export interface WorkerConfig {
   agentTimeoutMinutes: number;
   validationTimeoutMinutes: number;
   maxUsageLimitRetries: number;
+  staleInProgressMinutes: number;
 }
 
 export interface LoadedConfig {
@@ -103,6 +104,11 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
     ? configuredRepoPath
     : path.resolve(path.dirname(configPath), configuredRepoPath);
 
+  const agentTimeoutMinutes =
+    data.agentTimeoutMinutes === undefined
+      ? 120
+      : requirePositiveInteger(data.agentTimeoutMinutes, "agentTimeoutMinutes");
+
   return {
     repoPath,
     owner: requireString(data.owner, "owner"),
@@ -143,10 +149,7 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
       data.protectedPathPatterns,
       "protectedPathPatterns",
     ),
-    agentTimeoutMinutes:
-      data.agentTimeoutMinutes === undefined
-        ? 120
-        : requirePositiveInteger(data.agentTimeoutMinutes, "agentTimeoutMinutes"),
+    agentTimeoutMinutes,
     validationTimeoutMinutes:
       data.validationTimeoutMinutes === undefined
         ? 30
@@ -158,6 +161,13 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
       data.maxUsageLimitRetries === undefined
         ? 5
         : requirePositiveInteger(data.maxUsageLimitRetries, "maxUsageLimitRetries"),
+    staleInProgressMinutes:
+      data.staleInProgressMinutes === undefined
+        ? agentTimeoutMinutes + 30
+        : requirePositiveInteger(
+            data.staleInProgressMinutes,
+            "staleInProgressMinutes",
+          ),
   };
 }
 

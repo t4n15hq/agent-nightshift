@@ -12,6 +12,7 @@ const {
   runCommand,
   slugifyTitle,
 } = require("../dist/git");
+const { claimAgeMinutes, makeClaimMarker } = require("../dist/claims");
 
 test("slugifyTitle creates deterministic branch-safe text", () => {
   assert.equal(slugifyTitle("Fix: Café login / timeout!"), "fix-cafe-login-timeout");
@@ -56,6 +57,21 @@ test("usage limit detection matches real limit wording only", () => {
   assert.equal(detectUsageLimit(1, "exceeded the line limit in config"), false);
 });
 
+test("worker claim markers use timestamps and honor age", () => {
+  const claimedAt = new Date("2026-06-12T00:00:00.000Z");
+  const now = new Date("2026-06-12T02:30:00.000Z");
+  assert.equal(
+    makeClaimMarker(claimedAt),
+    "<!-- night-worker-claim:2026-06-12T00:00:00.000Z -->",
+  );
+  assert.equal(claimAgeMinutes(makeClaimMarker(claimedAt), now), 150);
+  assert.equal(claimAgeMinutes("not a claim", now), undefined);
+  assert.equal(
+    claimAgeMinutes("<!-- night-worker-claim:not-a-date -->", now),
+    undefined,
+  );
+});
+
 test("diffs are measured against the branch point even when the agent commits", async () => {
   const repoPath = await mkdtemp(path.join(os.tmpdir(), "night-worker-git-"));
   const git = new GitClient(repoPath);
@@ -84,13 +100,18 @@ test("diffs are measured against the branch point even when the agent commits", 
     assert.deepEqual(await git.changedFiles(baseSha), ["a.txt", "b.txt"]);
     assert.equal(await git.diffLineCount(baseSha), 2);
 
-    // commitAll picks up the stragglers and keeps the agent's commit.
+    // commitAll picks up the stragglers and squashes the agent's commit.
     const sha = await git.commitAll("worker commit", baseSha);
     assert.notEqual(sha, baseSha);
     assert.equal(await git.isClean(), true);
-
-    // A second commitAll with nothing new is a no-op, not an error.
-    assert.equal(await git.commitAll("noop", baseSha), sha);
+    assert.equal(
+      (await run("log", "-1", "--pretty=%s")).stdout.trim(),
+      "worker commit",
+    );
+    assert.equal(
+      (await run("rev-list", "--count", `${baseSha}..HEAD`)).stdout.trim(),
+      "1",
+    );
   } finally {
     await rm(repoPath, { recursive: true, force: true });
   }

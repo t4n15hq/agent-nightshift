@@ -6,6 +6,11 @@ interface GitHubLabel {
   name: string;
 }
 
+interface GitHubComment {
+  body: string;
+  createdAt: string;
+}
+
 interface PullRequestInfo {
   number: number;
   url: string;
@@ -98,7 +103,22 @@ export class GitHubClient {
     issueNumber: number,
     marker: string,
   ): Promise<number> {
-    const issue = parseJson<{ comments: Array<{ body: string }> }>(
+    return (await this.listComments(issueNumber)).filter((comment) =>
+      comment.body.includes(marker),
+    ).length;
+  }
+
+  async findLatestCommentContaining(
+    issueNumber: number,
+    marker: string,
+  ): Promise<GitHubComment | undefined> {
+    return (await this.listComments(issueNumber))
+      .filter((comment) => comment.body.includes(marker))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0];
+  }
+
+  private async listComments(issueNumber: number): Promise<GitHubComment[]> {
+    const issue = parseJson<{ comments: GitHubComment[] }>(
       await this.gh([
         "issue",
         "view",
@@ -110,7 +130,7 @@ export class GitHubClient {
       ]),
       `Could not read comments on issue #${issueNumber}`,
     );
-    return issue.comments.filter((comment) => comment.body.includes(marker)).length;
+    return issue.comments;
   }
 
   async findPullRequestByBranch(branch: string): Promise<PullRequestInfo | undefined> {

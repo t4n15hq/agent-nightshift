@@ -25,9 +25,12 @@ opens a pull request for human review. It never merges pull requests.
   can retry later, up to `maxUsageLimitRetries` times per issue; after that the
   issue is marked `claude-blocked` instead of looping forever.
 - Recovers issues stranded in `claude-in-progress` by an interrupted run
-  (crash, forced sleep) at the start of the next run.
+  after `staleInProgressMinutes` (default: agent timeout plus 30 minutes).
+  Recent or unmarked claims are left alone so another clone's active work is
+  not stolen.
 - Measures diffs against the recorded branch point, so work is not lost or
-  miscounted if the agent commits on its own.
+  miscounted if the agent commits on its own; agent commits are squashed into
+  the worker's required issue-specific commit before push.
 - Refuses to create a second PR when the deterministic issue branch already has
   a PR.
 
@@ -64,6 +67,8 @@ Use the returned path as `agentCommand`. Optional `agentTimeoutMinutes` and
 `validationTimeoutMinutes` fields default to 120 and 30. Optional
 `maxUsageLimitRetries` (default 5) caps how many times one issue is returned to
 ready after a usage or rate limit before it is marked blocked.
+`staleInProgressMinutes` defaults to `agentTimeoutMinutes + 30` and controls
+when an interrupted worker claim can be reclaimed.
 
 Optional `agentArgs` is an array of extra CLI flags inserted before the prompt.
 For Claude it defaults to `["--permission-mode", "acceptEdits"]`, which headless
@@ -127,8 +132,8 @@ node dist/index.js install-labels
 
 You can also run `scripts/install-labels.sh`. During the day, add
 `claude-ready` to issues you want considered. The worker chooses the oldest
-eligible open issue and ignores issues carrying any terminal or active worker
-label.
+eligible open issue. Active worker/PR labels remain ineligible; re-adding
+`claude-ready` to a blocked or human-review issue explicitly requests a retry.
 
 ## Check Setup
 

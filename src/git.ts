@@ -418,19 +418,25 @@ export class GitClient {
     }
   }
 
-  // The agent may have committed some or all of its work already, so an empty
-  // stage is only an error when the branch also has no commits past baseSha.
+  // The agent may commit despite the prompt. Preserve its file changes but
+  // squash them back to the branch point so the worker creates one predictable
+  // commit with the required issue-specific message.
   async commitAll(message: string, baseSha: string): Promise<string> {
+    if ((await this.headSha()) !== baseSha) {
+      assertSuccess(
+        await this.git(["reset", "--soft", baseSha]),
+        "Could not squash agent-created commits",
+      );
+    }
     assertSuccess(await this.git(["add", "--all"]), "Could not stage changes");
     const staged = await this.git(["diff", "--cached", "--quiet"]);
-    if (staged.exitCode !== 0) {
-      assertSuccess(
-        await this.git(["commit", "-m", message]),
-        "Could not commit changes",
-      );
-    } else if ((await this.headSha()) === baseSha) {
+    if (staged.exitCode === 0) {
       throw new Error("There were no changes to commit.");
     }
+    assertSuccess(
+      await this.git(["commit", "-m", message]),
+      "Could not commit changes",
+    );
     return this.headSha();
   }
 

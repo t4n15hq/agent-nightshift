@@ -4,6 +4,11 @@ import { open, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { runAgent } from "./agent";
 import {
+  CLAIM_MARKER_PREFIX,
+  claimAgeMinutes,
+  makeClaimMarker,
+} from "./claims";
+import {
   isInsideNightWindow,
   loadConfig,
   pathExists,
@@ -302,13 +307,36 @@ async function cleanupBranch(
 const USAGE_LIMIT_RETRY_MARKER = "<!-- night-worker-usage-limit-retry -->";
 
 // A crash (power loss, forced sleep, SIGKILL) after the in-progress label is
-// set leaves the issue invisible to findNextIssue forever. We hold the lock,
-// so any in-progress label seen now is stale and safe to reconcile.
+// set leaves the issue invisible to findNextIssue forever. A lock only covers
+// this local clone, so reclaim only claims made by this system that are older
+// than the configured timeout buffer. Recent or unmarked work may belong to
+// another clone or machine and must not be stolen.
 async function recoverStaleIssues(
   github: GitHubClient,
   config: WorkerConfig,
 ): Promise<void> {
   for (const issue of await github.listIssuesByLabel(config.labels.inProgress)) {
+    const claim = await github.findLatestCommentContaining(
+      issue.number,
+      CLAIM_MARKER_PREFIX,
+    );
+    const ageMinutes = claim ? claimAgeMinutes(claim.body) : undefined;
+    if (ageMinutes === undefined) {
+      logger.warn(
+        `Issue #${issue.number} is in progress without a valid worker claim; leaving it unchanged.`,
+      );
+      continue;
+    }
+    if (ageMinutes < config.staleInProgressMinutes) {
+      logger.info(
+        `Issue #${issue.number} has an active worker claim (${Math.max(
+          0,
+          Math.floor(ageMinutes),
+        )} minutes old); leaving it unchanged.`,
+      );
+      continue;
+    }
+
     const pr = await github.findPullRequestByBranch(branchName(issue));
     if (pr) {
       const state =
@@ -403,6 +431,10 @@ async function runWorker(config: WorkerConfig): Promise<number> {
     }
 
     await github.setIssueState(issue.number, [config.labels.inProgress]);
+    await github.commentOnIssue(
+      issue.number,
+      `${makeClaimMarker()}\nNight worker claimed this issue for an automated pass.`,
+    );
     const baseRef = await git.resolveBaseRef(config.baseBranch);
     await git.createBranch(workerBranch, baseRef);
     const baseSha = await git.headSha();
