@@ -107,7 +107,7 @@ async function acquireLock(repoPath: string): Promise<Lock> {
   if (!gitDirectory) {
     throw new Error("Could not locate the repository git directory.");
   }
-  const lockPath = path.resolve(repoPath, gitDirectory, "claude-night-worker.lock");
+  const lockPath = path.resolve(repoPath, gitDirectory, "agent-nightshift.lock");
   async function createLock(): Promise<void> {
     const handle = await open(lockPath, "wx");
     await handle.writeFile(`${process.pid}\n${new Date().toISOString()}\n`);
@@ -141,7 +141,7 @@ async function acquireLock(repoPath: string): Promise<Lock> {
       await createLock();
     } else {
       throw new Error(
-        `Another night worker appears to be running (${lockPath}${
+        `Another Agent Nightshift process appears to be running (${lockPath}${
           details ? `: ${details.replaceAll("\n", ", ")}` : ""
         }).`,
       );
@@ -346,13 +346,13 @@ async function recoverStaleIssues(
       await github.setIssueState(issue.number, [state]);
       await github.commentOnIssue(
         issue.number,
-        `Night worker found this issue stuck in "${config.labels.inProgress}" from an interrupted run. PR ${pr.url} exists (${pr.state.toLowerCase()}), so the label was reconciled.`,
+        `Agent Nightshift found this issue stuck in "${config.labels.inProgress}" from an interrupted run. PR ${pr.url} exists (${pr.state.toLowerCase()}), so the label was reconciled.`,
       );
     } else {
       await github.setIssueState(issue.number, [config.labels.ready]);
       await github.commentOnIssue(
         issue.number,
-        `Night worker found this issue stuck in "${config.labels.inProgress}" from an interrupted run with no pull request. It was returned to "${config.labels.ready}".`,
+        `Agent Nightshift found this issue stuck in "${config.labels.inProgress}" from an interrupted run with no pull request. It was returned to "${config.labels.ready}".`,
       );
     }
     logger.warn(`Recovered stale in-progress issue #${issue.number}.`);
@@ -368,7 +368,7 @@ async function failIssue(
   await github.setIssueState(issue.number, [state]);
   await github.commentOnIssue(
     issue.number,
-    `Night worker stopped without opening a normal pull request.\n\n${truncate(reason, 3_000)}`,
+    `Agent Nightshift stopped without opening a normal pull request.\n\n${truncate(reason, 3_000)}`,
   );
 }
 
@@ -433,7 +433,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
     await github.setIssueState(issue.number, [config.labels.inProgress]);
     await github.commentOnIssue(
       issue.number,
-      `${makeClaimMarker()}\nNight worker claimed this issue for an automated pass.`,
+      `${makeClaimMarker()}\nAgent Nightshift claimed this issue for an automated pass.`,
     );
     const baseRef = await git.resolveBaseRef(config.baseBranch);
     await git.createBranch(workerBranch, baseRef);
@@ -472,7 +472,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
       logger.warn("Agent usage or rate limit detected; restoring issue to ready.");
       await github.commentOnIssue(
         issue.number,
-        `Night worker paused: the agent reported a usage or rate limit. Returned to "${
+        `Agent Nightshift paused: the agent reported a usage or rate limit. Returned to "${
           config.labels.ready
         }" for retry ${previousRetries + 1} of ${
           config.maxUsageLimitRetries

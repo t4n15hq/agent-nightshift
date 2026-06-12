@@ -1,7 +1,7 @@
 # Target Repository Setup Runbook
 
-Use this runbook when a user asks Claude Code or Codex to configure Claude
-Night Worker for a specific GitHub repository.
+Use this runbook when a user asks Claude Code or Codex to configure Agent
+Nightshift for a specific GitHub repository.
 
 Execute the safe, discoverable steps yourself. Ask the user only for information
 that cannot be determined from the workspace or GitHub. Never guess a repository
@@ -22,7 +22,7 @@ If none is available, ask the user for the repository URL or `OWNER/REPO`.
 
 - Keep the worker checkout and target checkout in separate directories.
 - Use a dedicated target clone, not the user's active development checkout.
-- Never set `repoPath` to the Claude Night Worker repository itself.
+- Never set `repoPath` to the Agent Nightshift repository itself.
 - Refuse to proceed if the dedicated target clone has uncommitted changes.
 - Preserve existing `CLAUDE.md` and `AGENTS.md` files.
 - Never put secrets, tokens, or credentials in `config.json`.
@@ -32,7 +32,7 @@ If none is available, ask the user for the repository URL or `OWNER/REPO`.
 
 ## 1. Inspect The Worker
 
-From the Claude Night Worker root:
+From the Agent Nightshift root:
 
 ```bash
 git status --short --branch
@@ -77,22 +77,22 @@ Do not repurpose a checkout with unrelated changes.
 Use this default location unless the user specifies another:
 
 ```text
-~/Documents/night-worker-targets/<repo-name>
+~/Documents/agent-nightshift-targets/<repo-name>
 ```
 
 Create it:
 
 ```bash
-mkdir -p ~/Documents/night-worker-targets
+mkdir -p ~/Documents/agent-nightshift-targets
 gh repo clone OWNER/REPO \
-  ~/Documents/night-worker-targets/<repo-name>
+  ~/Documents/agent-nightshift-targets/<repo-name>
 ```
 
 Verify:
 
 ```bash
-git -C ~/Documents/night-worker-targets/<repo-name> status --short --branch
-git -C ~/Documents/night-worker-targets/<repo-name> remote -v
+git -C ~/Documents/agent-nightshift-targets/<repo-name> status --short --branch
+git -C ~/Documents/agent-nightshift-targets/<repo-name> remote -v
 ```
 
 The working tree must be clean and `origin` must match `OWNER/REPO`.

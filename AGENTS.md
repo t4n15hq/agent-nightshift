@@ -2,7 +2,7 @@
 
 Follow the safety rules in `CLAUDE.md`.
 
-When the user asks to configure Claude Night Worker for a specific repository,
+When the user asks to configure Agent Nightshift for a specific repository,
 read and execute `docs/TARGET_REPOSITORY_SETUP.md`.
 
 Do not install cron or change macOS wake schedules until:

@@ -1,11 +1,11 @@
 # Review and Reliability Fixes — 2026-06-11
 
-This documents a full review of the night worker and the reasoning behind the
-changes shipped with it. The goal of the project: use idle overnight Claude
-usage limits to implement labeled GitHub issues unattended, with PRs ready for
-human review in the morning. The review question was "will it actually do that
-on night one?" — and the answer was no, for two reasons that had nothing to do
-with code quality.
+This documents a full review of Agent Nightshift and the reasoning behind the
+changes shipped with it. The goal of the project: use idle overnight coding
+agent capacity to implement labeled GitHub issues unattended, with PRs ready
+for human review in the morning. The review question was "will it actually do
+that on night one?" — and the answer was no, for two reasons that had nothing
+to do with code quality.
 
 ## What was already good
 

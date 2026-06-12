@@ -12,8 +12,8 @@
 
 ## Configuring A Target Repository
 
-When the user asks to set up this worker for a specific repository, read and
-execute `docs/TARGET_REPOSITORY_SETUP.md`.
+When the user asks to set up Agent Nightshift for a specific repository, read
+and execute `docs/TARGET_REPOSITORY_SETUP.md`.
 
 Use a dedicated clean clone for the target. Never configure the worker to
 operate on this repository's own checkout. Do not install cron or change
