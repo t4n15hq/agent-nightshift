@@ -45,6 +45,33 @@ clean clone and do not edit that clone while the worker is active.
 - Claude Code or Codex CLI
 - Push access to the target GitHub repository
 
+## Set Up With Claude Code
+
+A friend can clone this repository and let Claude Code perform the
+repository-specific setup:
+
+```bash
+git clone https://github.com/t4n15hq/agent-nightshift.git
+cd agent-nightshift
+claude
+```
+
+Then give Claude Code this prompt, replacing the example target:
+
+```text
+Set up Agent Nightshift for https://github.com/OWNER/REPO.
+Follow CLAUDE.md and docs/TARGET_REPOSITORY_SETUP.md.
+Use Claude Code as the coding agent.
+Do not install cron or change macOS wake schedules until doctor and dry-run
+pass, then ask me for explicit approval.
+```
+
+Claude Code will install dependencies, create a separate dedicated target
+clone, inspect that repository's validation commands and agent instructions,
+configure the ignored `config.json`, install labels, and run `doctor` and
+`dry-run`. It must ask before installing cron or changing the Mac's wake
+schedule.
+
 ## Install
 
 ```bash
@@ -198,6 +225,20 @@ It preserves existing cron entries and installs:
 The installed line uses absolute local paths and captures the current `PATH` so
 cron can locate `gh` and the configured agent. Re-running the script replaces
 this worker's prior entry instead of duplicating it.
+
+## Laptop Power Requirements
+
+For reliable overnight operation, the laptop must be:
+
+- Powered on.
+- Logged in.
+- Connected to power and the internet.
+- Allowed to wake from sleep.
+
+The screen can be locked. Normal cron jobs do not run while the Mac is asleep,
+so configure a scheduled `pmset` wake before the first overnight run. A fully
+shut-down Mac is not a reliable unattended setup because FileVault, the login
+keychain, and agent credentials may remain unavailable until a user logs in.
 
 ## Keeping the Machine Awake
 

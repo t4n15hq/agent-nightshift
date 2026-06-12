@@ -37,6 +37,8 @@
     "**/infra/**",
     "**/terraform/**",
     "**/auth/**",
-    "**/billing/**"
+    "**/billing/**",
+    "**/migrations/**",
+    "**/permissions/**"
   ]
 }
