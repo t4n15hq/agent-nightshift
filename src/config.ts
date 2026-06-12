@@ -173,7 +173,10 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
 
 export async function loadConfig(configArg?: string): Promise<LoadedConfig> {
   const requestedPath =
-    configArg ?? process.env.CLAUDE_NIGHT_WORKER_CONFIG ?? "config.json";
+    configArg ??
+    process.env.AGENT_NIGHTSHIFT_CONFIG ??
+    process.env.CLAUDE_NIGHT_WORKER_CONFIG ??
+    "config.json";
   const configPath = path.resolve(expandHome(requestedPath));
 
   try {

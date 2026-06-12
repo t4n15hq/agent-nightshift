@@ -1,7 +1,7 @@
-# Claude Night Worker
+# Agent Nightshift
 
-Claude Night Worker is a local TypeScript automation that takes one GitHub issue
-at a time, asks Claude Code or Codex to implement it, validates the change, and
+Agent Nightshift is a local TypeScript automation that takes one GitHub issue at
+a time, asks Claude Code or Codex to implement it, validates the change, and
 opens a pull request for human review. It never merges pull requests.
 
 ## Safety Model
@@ -55,6 +55,10 @@ cp config.example.json config.json
 
 Edit `config.json`. At minimum, set `repoPath`, `owner`, `repo`, `baseBranch`,
 `agent`, and `agentCommand`. `config.json` is ignored by git.
+
+Claude Code and Codex can perform the target-repository setup by following
+[`docs/TARGET_REPOSITORY_SETUP.md`](docs/TARGET_REPOSITORY_SETUP.md). The root
+`CLAUDE.md` and `AGENTS.md` direct agents to that runbook.
 
 For cron reliability, an absolute agent path is recommended:
 
@@ -152,7 +156,8 @@ To use a non-default configuration path:
 node dist/index.js doctor --config /path/to/config.json
 ```
 
-The `CLAUDE_NIGHT_WORKER_CONFIG` environment variable is also supported.
+The `AGENT_NIGHTSHIFT_CONFIG` environment variable is also supported.
+`CLAUDE_NIGHT_WORKER_CONFIG` remains available as a compatibility alias.
 
 ## Run
 
@@ -187,7 +192,7 @@ scripts/install-cron.sh
 It preserves existing cron entries and installs:
 
 ```cron
-5,35 0-6 * * * cd /path/to/claude-night-worker && caffeinate -i node dist/index.js run >> ~/claude-night-worker.log 2>&1
+5,35 0-6 * * * cd /path/to/agent-nightshift && caffeinate -i node dist/index.js run >> ~/agent-nightshift.log 2>&1
 ```
 
 The installed line uses absolute local paths and captures the current `PATH` so

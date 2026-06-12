@@ -1,8 +1,8 @@
 {
-  "name": "claude-night-worker",
+  "name": "agent-nightshift",
   "version": "1.0.0",
   "private": true,
-  "description": "A safe, local overnight GitHub issue worker for Claude Code and Codex.",
+  "description": "Safe local overnight GitHub issue automation for coding agents.",
   "license": "MIT",
   "engines": {
     "node": ">=20"
