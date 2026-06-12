@@ -47,7 +47,7 @@ clean clone and do not edit that clone while the worker is active.
 
 ## Set Up With Claude Code
 
-A friend can clone this repository and let Claude Code perform the
+A user can clone this repository and let Claude Code perform the
 repository-specific setup:
 
 ```bash
