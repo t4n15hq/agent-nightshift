@@ -1,0 +1,39 @@
+{
+  "repoPath": "/Users/tanishq/code/my-repo",
+  "owner": "OWNER",
+  "repo": "REPO",
+  "baseBranch": "main",
+  "agent": "claude",
+  "agentCommand": "claude",
+  "nightWindow": {
+    "startHour": 0,
+    "endHour": 6
+  },
+  "labels": {
+    "ready": "claude-ready",
+    "inProgress": "claude-in-progress",
+    "prOpened": "claude-pr-opened",
+    "blocked": "claude-blocked",
+    "humanReview": "human-review-required"
+  },
+  "validationCommands": [
+    "npm run lint",
+    "npm run typecheck",
+    "npm test"
+  ],
+  "maxDiffLines": 800,
+  "openDraftPrOnValidationFailure": true,
+  "protectedPathPatterns": [
+    ".env",
+    ".env.*",
+    "**/.env",
+    "**/.env.*",
+    "**/*secret*",
+    "**/*credential*",
+    "**/deploy/**",
+    "**/infra/**",
+    "**/terraform/**",
+    "**/auth/**",
+    "**/billing/**"
+  ]
+}
