@@ -56,6 +56,10 @@ cp config.example.json config.json
 Edit `config.json`. At minimum, set `repoPath`, `owner`, `repo`, `baseBranch`,
 `agent`, and `agentCommand`. `config.json` is ignored by git.
 
+Claude Code and Codex can perform the target-repository setup by following
+[`docs/TARGET_REPOSITORY_SETUP.md`](docs/TARGET_REPOSITORY_SETUP.md). The root
+`CLAUDE.md` and `AGENTS.md` direct agents to that runbook.
+
 For cron reliability, an absolute agent path is recommended:
 
 ```bash
