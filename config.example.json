@@ -5,6 +5,8 @@
   "baseBranch": "main",
   "agent": "claude",
   "agentCommand": "claude",
+  "agentArgs": ["--permission-mode", "acceptEdits"],
+  "maxUsageLimitRetries": 5,
   "nightWindow": {
     "startHour": 0,
     "endHour": 6

@@ -23,6 +23,7 @@ export interface WorkerConfig {
   baseBranch: string;
   agent: "claude" | "codex";
   agentCommand: string;
+  agentArgs: string[];
   nightWindow: NightWindow;
   labels: LabelConfig;
   validationCommands: string[];
@@ -31,6 +32,7 @@ export interface WorkerConfig {
   protectedPathPatterns: string[];
   agentTimeoutMinutes: number;
   validationTimeoutMinutes: number;
+  maxUsageLimitRetries: number;
 }
 
 export interface LoadedConfig {
@@ -108,6 +110,15 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
     baseBranch: requireString(data.baseBranch, "baseBranch"),
     agent,
     agentCommand: requireString(data.agentCommand, "agentCommand"),
+    // Headless `claude -p` auto-denies Edit/Write/Bash without a permission
+    // mode, so the agent could never change files. acceptEdits approves file
+    // edits only; the worker's own snapshot/diff checks remain the backstop.
+    agentArgs:
+      data.agentArgs === undefined
+        ? agent === "claude"
+          ? ["--permission-mode", "acceptEdits"]
+          : []
+        : requireStringArray(data.agentArgs, "agentArgs"),
     nightWindow: {
       startHour: requireHour(nightWindow.startHour, "nightWindow.startHour"),
       endHour: requireHour(nightWindow.endHour, "nightWindow.endHour"),
@@ -143,6 +154,10 @@ function parseConfig(raw: unknown, configPath: string): WorkerConfig {
             data.validationTimeoutMinutes,
             "validationTimeoutMinutes",
           ),
+    maxUsageLimitRetries:
+      data.maxUsageLimitRetries === undefined
+        ? 5
+        : requirePositiveInteger(data.maxUsageLimitRetries, "maxUsageLimitRetries"),
   };
 }
 

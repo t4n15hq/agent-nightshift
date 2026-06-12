@@ -10,21 +10,27 @@ export interface AgentResult {
   usageLimited: boolean;
 }
 
+// Only match wording the CLIs actually emit when out of capacity. Generic
+// words like "limit", "usage", or "reset" appear in ordinary failures (stack
+// traces, `git reset`, code that mentions rate limiting) and previously
+// caused failed runs to be misclassified and retried forever.
 const LIMIT_PATTERNS = [
-  /rate\s*limit/i,
-  /usage\s*limit/i,
-  /\blimit\b/i,
-  /\busage\b/i,
-  /\bquota\b/i,
-  /try\s+again/i,
-  /\breset\b/i,
+  /usage limit/i,
+  /rate[\s_-]?limit/i,
+  /quota exceeded/i,
+  /out of (credits|tokens)/i,
+  /insufficient credit/i,
 ];
+
+export function detectUsageLimit(exitCode: number, output: string): boolean {
+  return exitCode !== 0 && LIMIT_PATTERNS.some((pattern) => pattern.test(output));
+}
 
 function getAgentArgs(config: WorkerConfig, prompt: string): string[] {
   if (config.agent === "claude") {
-    return ["-p", prompt];
+    return [...config.agentArgs, "-p", prompt];
   }
-  return ["exec", "--sandbox", "workspace-write", prompt];
+  return ["exec", "--sandbox", "workspace-write", ...config.agentArgs, prompt];
 }
 
 export async function runAgent(
@@ -42,13 +48,14 @@ export async function runAgent(
       onStderr: (chunk) => process.stderr.write(chunk),
     },
   );
-  const combined = `${result.stdout}\n${result.stderr}`;
   return {
     exitCode: result.exitCode,
     stdout: result.stdout,
     stderr: result.stderr,
     timedOut: result.timedOut,
-    usageLimited:
-      result.exitCode !== 0 && LIMIT_PATTERNS.some((pattern) => pattern.test(combined)),
+    usageLimited: detectUsageLimit(
+      result.exitCode,
+      `${result.stdout}\n${result.stderr}`,
+    ),
   };
 }

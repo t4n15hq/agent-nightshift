@@ -150,8 +150,12 @@ async function acquireLock(repoPath: string): Promise<Lock> {
 }
 
 async function commandExists(command: string): Promise<boolean> {
-  const result = await runCommand(command, ["--version"]);
-  return result.exitCode === 0;
+  try {
+    const result = await runCommand(command, ["--version"]);
+    return result.exitCode === 0;
+  } catch {
+    return false;
+  }
 }
 
 async function doctor(config: WorkerConfig): Promise<number> {
@@ -288,9 +292,43 @@ async function cleanupBranch(
     );
   }
   if ((await git.currentBranch()) !== originalBranch) {
-    await git.switchBranch(originalBranch);
+    // Force: if the agent committed protected-file changes, the restore above
+    // leaves the tree dirty against that commit; the branch is deleted anyway.
+    await git.switchBranch(originalBranch, { force: true });
   }
   await git.deleteLocalBranch(workerBranch);
+}
+
+const USAGE_LIMIT_RETRY_MARKER = "<!-- night-worker-usage-limit-retry -->";
+
+// A crash (power loss, forced sleep, SIGKILL) after the in-progress label is
+// set leaves the issue invisible to findNextIssue forever. We hold the lock,
+// so any in-progress label seen now is stale and safe to reconcile.
+async function recoverStaleIssues(
+  github: GitHubClient,
+  config: WorkerConfig,
+): Promise<void> {
+  for (const issue of await github.listIssuesByLabel(config.labels.inProgress)) {
+    const pr = await github.findPullRequestByBranch(branchName(issue));
+    if (pr) {
+      const state =
+        pr.state.toLowerCase() === "open"
+          ? config.labels.prOpened
+          : config.labels.humanReview;
+      await github.setIssueState(issue.number, [state]);
+      await github.commentOnIssue(
+        issue.number,
+        `Night worker found this issue stuck in "${config.labels.inProgress}" from an interrupted run. PR ${pr.url} exists (${pr.state.toLowerCase()}), so the label was reconciled.`,
+      );
+    } else {
+      await github.setIssueState(issue.number, [config.labels.ready]);
+      await github.commentOnIssue(
+        issue.number,
+        `Night worker found this issue stuck in "${config.labels.inProgress}" from an interrupted run with no pull request. It was returned to "${config.labels.ready}".`,
+      );
+    }
+    logger.warn(`Recovered stale in-progress issue #${issue.number}.`);
+  }
 }
 
 async function failIssue(
@@ -329,6 +367,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
   try {
     await github.authStatus();
     await github.ensureLabels();
+    await recoverStaleIssues(github, config);
     issue = await github.findNextIssue();
     if (!issue) {
       logger.info(`No open issues are labeled "${config.labels.ready}".`);
@@ -366,6 +405,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
     await github.setIssueState(issue.number, [config.labels.inProgress]);
     const baseRef = await git.resolveBaseRef(config.baseBranch);
     await git.createBranch(workerBranch, baseRef);
+    const baseSha = await git.headSha();
     protectedSnapshot = await git.snapshotProtectedFiles(
       config.protectedPathPatterns,
     );
@@ -373,13 +413,38 @@ async function runWorker(config: WorkerConfig): Promise<number> {
 
     const agent = await runAgent(config, buildPrompt(issue));
     if (agent.usageLimited) {
-      logger.warn("Agent usage or rate limit detected; restoring issue to ready.");
       await cleanupBranch(
         git,
         originalBranch,
         workerBranch,
         config,
         protectedSnapshot,
+      );
+      const previousRetries = await github.countCommentsContaining(
+        issue.number,
+        USAGE_LIMIT_RETRY_MARKER,
+      );
+      if (previousRetries >= config.maxUsageLimitRetries) {
+        await failIssue(
+          github,
+          issue,
+          config.labels.blocked,
+          `The agent reported a usage or rate limit ${
+            previousRetries + 1
+          } times for this issue, reaching the configured maximum of ${
+            config.maxUsageLimitRetries
+          } retries. A real failure may be misclassified as a limit; check the worker log.`,
+        );
+        return 1;
+      }
+      logger.warn("Agent usage or rate limit detected; restoring issue to ready.");
+      await github.commentOnIssue(
+        issue.number,
+        `Night worker paused: the agent reported a usage or rate limit. Returned to "${
+          config.labels.ready
+        }" for retry ${previousRetries + 1} of ${
+          config.maxUsageLimitRetries
+        }.\n\n${USAGE_LIMIT_RETRY_MARKER}`,
       );
       await github.setIssueState(issue.number, [config.labels.ready]);
       return 0;
@@ -402,7 +467,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
       return 1;
     }
 
-    let changed = await git.changedFiles();
+    let changed = await git.changedFiles(baseSha);
     let protectedChanged = [
       ...new Set([
         ...protectedFiles(config, changed),
@@ -444,7 +509,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
       return 1;
     }
 
-    let diffLines = await git.diffLineCount();
+    let diffLines = await git.diffLineCount(baseSha);
     if (diffLines > config.maxDiffLines) {
       await cleanupBranch(
         git,
@@ -463,7 +528,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
     }
 
     const validation = await runValidation(config);
-    changed = await git.changedFiles();
+    changed = await git.changedFiles(baseSha);
     protectedChanged = [
       ...new Set([
         ...protectedFiles(config, changed),
@@ -473,7 +538,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
         )),
       ]),
     ].sort();
-    diffLines = await git.diffLineCount();
+    diffLines = await git.diffLineCount(baseSha);
     if (protectedChanged.length > 0 || diffLines > config.maxDiffLines) {
       const reason =
         protectedChanged.length > 0
@@ -513,7 +578,7 @@ async function runWorker(config: WorkerConfig): Promise<number> {
     }
 
     const commitTitle = `Fix issue #${issue.number}: ${issue.title}`;
-    await git.commit(commitTitle);
+    await git.commitAll(commitTitle, baseSha);
     await git.push(workerBranch);
     const prUrl = await github.openPullRequest({
       branch: workerBranch,

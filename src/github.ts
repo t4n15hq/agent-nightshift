@@ -59,8 +59,8 @@ export class GitHubClient {
     }
   }
 
-  async findNextIssue(): Promise<GitHubIssue | undefined> {
-    const issues = parseJson<GitHubIssue[]>(
+  async listIssuesByLabel(label: string): Promise<GitHubIssue[]> {
+    return parseJson<GitHubIssue[]>(
       await this.gh([
         "issue",
         "list",
@@ -69,24 +69,48 @@ export class GitHubClient {
         "--state",
         "open",
         "--label",
-        this.config.labels.ready,
+        label,
         "--limit",
         "100",
         "--json",
         "number,title,body,url,createdAt,labels",
       ]),
-      "Could not list ready issues",
+      `Could not list issues labeled "${label}"`,
     );
+  }
 
+  async findNextIssue(): Promise<GitHubIssue | undefined> {
+    const issues = await this.listIssuesByLabel(this.config.labels.ready);
+
+    // A failed run always strips the ready label, so ready alongside blocked
+    // or human-review can only mean a human re-added it to request a retry.
+    // Only active states make an issue ineligible.
     const ignored = new Set([
       this.config.labels.inProgress,
       this.config.labels.prOpened,
-      this.config.labels.blocked,
-      this.config.labels.humanReview,
     ]);
     return issues
       .filter((issue) => !issue.labels.some((label) => ignored.has(label.name)))
       .sort((left, right) => left.createdAt.localeCompare(right.createdAt))[0];
+  }
+
+  async countCommentsContaining(
+    issueNumber: number,
+    marker: string,
+  ): Promise<number> {
+    const issue = parseJson<{ comments: Array<{ body: string }> }>(
+      await this.gh([
+        "issue",
+        "view",
+        String(issueNumber),
+        "--repo",
+        this.repoArg,
+        "--json",
+        "comments",
+      ]),
+      `Could not read comments on issue #${issueNumber}`,
+    );
+    return issue.comments.filter((comment) => comment.body.includes(marker)).length;
   }
 
   async findPullRequestByBranch(branch: string): Promise<PullRequestInfo | undefined> {

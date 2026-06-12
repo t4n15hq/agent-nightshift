@@ -246,16 +246,28 @@ export class GitClient {
     );
   }
 
-  async switchBranch(branch: string): Promise<void> {
-    assertSuccess(
-      await this.git(["switch", branch]),
-      `Could not switch back to ${branch}`,
-    );
+  async switchBranch(branch: string, options?: { force?: boolean }): Promise<void> {
+    const args = ["switch"];
+    if (options?.force) {
+      args.push("--discard-changes");
+    }
+    args.push(branch);
+    assertSuccess(await this.git(args), `Could not switch back to ${branch}`);
   }
 
-  async changedFiles(cwd = this.repoPath): Promise<string[]> {
+  async headSha(): Promise<string> {
+    return assertSuccess(
+      await this.git(["rev-parse", "HEAD"]),
+      "Could not read the current commit",
+    ).stdout.trim();
+  }
+
+  // Diff against the recorded branch point, not HEAD: agents sometimes commit
+  // despite the prompt, and a HEAD-relative diff would then look empty and the
+  // work would be discarded as "no changes".
+  async changedFiles(baseRef: string, cwd = this.repoPath): Promise<string[]> {
     const tracked = assertSuccess(
-      await this.git(["diff", "--name-only", "-z", "HEAD"], cwd),
+      await this.git(["diff", "--name-only", "-z", baseRef], cwd),
       "Could not inspect changed files",
     );
     const untracked = assertSuccess(
@@ -267,9 +279,9 @@ export class GitClient {
       .sort();
   }
 
-  async diffLineCount(cwd = this.repoPath): Promise<number> {
+  async diffLineCount(baseRef: string, cwd = this.repoPath): Promise<number> {
     const result = assertSuccess(
-      await this.git(["diff", "--numstat", "HEAD"], cwd),
+      await this.git(["diff", "--numstat", baseRef], cwd),
       "Could not calculate diff size",
     );
     let total = 0;
@@ -301,7 +313,7 @@ export class GitClient {
         return Number.MAX_SAFE_INTEGER;
       }
       const text = content.toString("utf8");
-      total += text === "" ? 0 : text.split("\n").length;
+      total += text === "" ? 0 : text.replace(/\n$/, "").split("\n").length;
     }
     return total;
   }
@@ -406,13 +418,20 @@ export class GitClient {
     }
   }
 
-  async commit(message: string): Promise<string> {
+  // The agent may have committed some or all of its work already, so an empty
+  // stage is only an error when the branch also has no commits past baseSha.
+  async commitAll(message: string, baseSha: string): Promise<string> {
     assertSuccess(await this.git(["add", "--all"]), "Could not stage changes");
-    assertSuccess(await this.git(["commit", "-m", message]), "Could not commit changes");
-    return assertSuccess(
-      await this.git(["rev-parse", "HEAD"]),
-      "Could not read the new commit",
-    ).stdout.trim();
+    const staged = await this.git(["diff", "--cached", "--quiet"]);
+    if (staged.exitCode !== 0) {
+      assertSuccess(
+        await this.git(["commit", "-m", message]),
+        "Could not commit changes",
+      );
+    } else if ((await this.headSha()) === baseSha) {
+      throw new Error("There were no changes to commit.");
+    }
+    return this.headSha();
   }
 
   async push(branch: string): Promise<void> {
