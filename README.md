@@ -58,9 +58,11 @@ The rest of this README documents the local worker.
   base branch before starting the agent.
 - Runs Claude Code with `--permission-mode acceptEdits` by default: file edits
   are auto-approved (headless mode cannot answer prompts and would otherwise be
-  unable to change anything), while arbitrary shell commands stay denied. The
-  worker's own protected-path snapshots and diff limits remain the backstop. It
-  never uses `--dangerously-skip-permissions` and never auto-merges.
+  unable to change anything), while arbitrary shell commands stay denied.
+- Runs Codex as `codex exec --sandbox workspace-write`; it never adds
+  `--dangerously-bypass-approvals-and-sandbox` or `--full-auto`.
+- The worker's own protected-path snapshots and diff limits remain the backstop.
+  It never auto-merges.
 - Snapshots protected files, including ignored files such as `.env`, and
   restores them if the agent touches them.
 - Blocks protected paths and oversized diffs before commit, then checks again
@@ -116,6 +118,32 @@ clone, inspect that repository's validation commands and agent instructions,
 configure the ignored `config.json`, install labels, and run `doctor` and
 `dry-run`. It must ask before installing cron or changing the Mac's wake
 schedule.
+
+## Set Up With Codex
+
+Codex can configure **local mode** of Agent Nightshift. Cloud mode uses a
+Claude Code on the web Routine and is not available through Codex.
+
+```bash
+git clone https://github.com/t4n15hq/agent-nightshift.git
+cd agent-nightshift
+codex
+```
+
+Then give Codex this prompt, replacing the example target:
+
+```text
+Set up Agent Nightshift local mode for https://github.com/OWNER/REPO.
+Follow AGENTS.md, .codex/skills/nightshift/SKILL.md, and
+docs/TARGET_REPOSITORY_SETUP.md.
+Use Codex CLI as the coding agent.
+Do not install cron or change macOS wake schedules until doctor and dry-run
+pass, then ask me for explicit approval.
+```
+
+The Codex skill configures `agent: "codex"` and runs Codex with its
+`workspace-write` sandbox. It does not enable dangerous permission-bypass
+flags.
 
 ## Install
 
