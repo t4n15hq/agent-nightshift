@@ -30,6 +30,35 @@ If none is available, ask the user for the repository URL or `OWNER/REPO`.
 - Never auto-merge.
 - Require explicit user approval before modifying cron or macOS power schedules.
 
+## Choose The Local Agent
+
+The local worker supports Claude Code and Codex. Use the agent the user
+explicitly selects. The cloud Routine described elsewhere in this repository is
+Claude Code on the web only and is not a Codex feature.
+
+For Codex, resolve its absolute command path:
+
+```bash
+command -v codex
+```
+
+Configure the worker with:
+
+```json
+{
+  "agent": "codex",
+  "agentCommand": "/absolute/path/to/codex",
+  "agentArgs": []
+}
+```
+
+The worker runs `codex exec --sandbox workspace-write`. Do not add
+`--dangerously-bypass-approvals-and-sandbox`, `--full-auto`, or any other
+permission-bypass flag.
+
+For Claude Code, use `agent: "claude"`, its absolute command path, and the
+default `agentArgs` value `["--permission-mode", "acceptEdits"]`.
+
 ## 1. Inspect The Worker
 
 From the Agent Nightshift root:
@@ -161,7 +190,9 @@ deployment, migration, destructive, or production command.
 
 ## 6. Configure The Worker
 
-Edit the worker's ignored `config.json`. Preserve unrelated settings and set:
+Edit the worker's ignored `config.json`. Preserve unrelated settings and set
+`SELECTED_AGENT`, its absolute command path, and matching arguments from the
+previous section:
 
 ```json
 {
@@ -169,9 +200,9 @@ Edit the worker's ignored `config.json`. Preserve unrelated settings and set:
   "owner": "OWNER",
   "repo": "REPO",
   "baseBranch": "main",
-  "agent": "claude",
-  "agentCommand": "/absolute/path/to/claude",
-  "agentArgs": ["--permission-mode", "acceptEdits"],
+  "agent": "SELECTED_AGENT",
+  "agentCommand": "/absolute/path/to/selected-agent",
+  "agentArgs": [],
   "maxUsageLimitRetries": 5,
   "staleInProgressMinutes": 150
 }
