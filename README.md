@@ -25,22 +25,26 @@ simultaneously.
 ## Cloud Mode (`/nightshift` skill)
 
 The skill lives at [`.claude/skills/nightshift/`](.claude/skills/nightshift/).
-To use it:
+Setup is a single invocation: open https://claude.ai/code, run `/nightshift`
+(or ask Claude to set up nightshift for `OWNER/REPO` — it can bind the
+schedule to any repo you've opened on claude.ai/code), answer one round of
+questions, and approve the schedule.
 
-1. Get the skill into the target repository — either copy the
-   `.claude/skills/nightshift/` directory there via a small PR, or open a
-   Claude Code session on this repo and ask it to set up nightshift for
-   `OWNER/REPO` (it will offer to open that PR).
-2. Open https://claude.ai/code, start a session on the target repository, and
-   run `/nightshift`.
-3. Answer the setup questions (night window and timezone, runs per night,
-   draft-PR policy, notifications) and approve the schedule it shows you.
+From then on, each nightly cloud session runs a pipeline: self-check (with
+loud self-disable after repeated systemic failures), steward existing
+nightshift PRs (rebase conflicts, fix its own CI failures, address review
+comments), pick at most one new issue (human `claude-ready` labels first,
+optional auto-triage of the backlog when none are labeled), implement it on
+a `claude/issue-<number>-<slug>` branch under a strict minimal-diff quality
+bar adapted from [Ponytail](https://github.com/DietrichGebert/ponytail),
+self-review the diff, enforce the protected-path and diff-size guards, and
+open a PR for morning review. Every run appends its outcome to a rolling
+"🌙 Nightshift log" issue. If no issue can be handled safely and well, it
+does nothing — a quiet night beats a slop PR.
 
-Each nightly cloud session picks at most one `claude-ready` issue, implements
-it on a `claude/issue-<number>-<slug>` branch, runs the repo's validation
-commands, enforces the protected-path and diff-size guards, and opens a PR
-for morning review. Full details, including how the safety model maps to
-cloud mode and how to pause or uninstall, are in
+Tuning later is a one-line commit to `.claude/nightshift.json` in the target
+repo, not a re-setup. Full details, including the quality bar and how to
+pause, retune, or uninstall, are in
 [`docs/CLOUD_NIGHTSHIFT.md`](docs/CLOUD_NIGHTSHIFT.md).
 
 The rest of this README documents the local worker.
