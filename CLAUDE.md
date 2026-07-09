@@ -12,8 +12,15 @@
 
 ## Configuring A Target Repository
 
-When the user asks to set up Agent Nightshift for a specific repository, read
-and execute `docs/TARGET_REPOSITORY_SETUP.md`.
+Agent Nightshift has two modes; pick based on what the user asks for:
+
+- **Cloud mode** (overnight cloud agents, laptop can be off): follow the
+  `/nightshift` skill in `.claude/skills/nightshift/SKILL.md`. It must run in
+  a Claude Code on the web session on the target repository; from this repo,
+  offer to open a PR copying the skill directory into the target.
+- **Local mode** (cron + local CLI worker): when the user asks to set up the
+  local worker for a specific repository, read and execute
+  `docs/TARGET_REPOSITORY_SETUP.md`.
 
 Use a dedicated clean clone for the target. Never configure the worker to
 operate on this repository's own checkout. Do not install cron or change

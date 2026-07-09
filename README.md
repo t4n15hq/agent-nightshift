@@ -1,8 +1,49 @@
 # Agent Nightshift
 
-Agent Nightshift is a local TypeScript automation that takes one GitHub issue at
-a time, asks Claude Code or Codex to implement it, validates the change, and
-opens a pull request for human review. It never merges pull requests.
+Agent Nightshift works through your GitHub issue backlog overnight: it takes
+one `claude-ready` issue at a time, asks a coding agent to implement it,
+validates the change, and opens a pull request for human review. It never
+merges pull requests.
+
+It comes in two modes:
+
+- **Cloud mode (`/nightshift` skill, recommended)** — a scheduled Claude Code
+  on the web Routine spawns a fresh cloud session each night. Runs on
+  Anthropic's infrastructure, so it uses subscription capacity that would
+  otherwise expire unused while you sleep, and **your laptop can be off**.
+  See [Cloud Mode](#cloud-mode-nightshift-skill) and
+  [`docs/CLOUD_NIGHTSHIFT.md`](docs/CLOUD_NIGHTSHIFT.md).
+- **Local mode (TypeScript worker)** — cron runs the worker on your machine,
+  driving the Claude Code or Codex CLI. Guards are enforced in code outside
+  the agent, but the machine must stay awake overnight. Everything from
+  [Requirements](#requirements) down describes this mode.
+
+Both modes share the same labels, branch naming, and never-merge policy, so
+you can switch between them — just don't point both at the same repository
+simultaneously.
+
+## Cloud Mode (`/nightshift` skill)
+
+The skill lives at [`.claude/skills/nightshift/`](.claude/skills/nightshift/).
+To use it:
+
+1. Get the skill into the target repository — either copy the
+   `.claude/skills/nightshift/` directory there via a small PR, or open a
+   Claude Code session on this repo and ask it to set up nightshift for
+   `OWNER/REPO` (it will offer to open that PR).
+2. Open https://claude.ai/code, start a session on the target repository, and
+   run `/nightshift`.
+3. Answer the setup questions (night window and timezone, runs per night,
+   draft-PR policy, notifications) and approve the schedule it shows you.
+
+Each nightly cloud session picks at most one `claude-ready` issue, implements
+it on a `claude/issue-<number>-<slug>` branch, runs the repo's validation
+commands, enforces the protected-path and diff-size guards, and opens a PR
+for morning review. Full details, including how the safety model maps to
+cloud mode and how to pause or uninstall, are in
+[`docs/CLOUD_NIGHTSHIFT.md`](docs/CLOUD_NIGHTSHIFT.md).
+
+The rest of this README documents the local worker.
 
 ## Safety Model
 
